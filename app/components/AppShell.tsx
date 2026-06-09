@@ -17,9 +17,12 @@ type Admin = { name: string; email: string; image: string | null };
 function Brand() {
   return (
     <div className="flex items-center gap-2 px-5 py-6">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-white">
-        ⦿
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/bo-logo.svg"
+        alt="Rond Point Backoffice"
+        className="h-9 w-9 rounded-xl"
+      />
       <div className="leading-tight">
         <div className="text-sm font-extrabold text-fg">Rond Point</div>
         <div className="text-xs font-semibold text-muted">Backoffice</div>
@@ -110,9 +113,8 @@ export default function AppShell({
           </svg>
         </button>
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-sm text-white">
-            ⦿
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/bo-logo.svg" alt="" className="h-7 w-7 rounded-lg" />
           <span className="text-sm font-extrabold text-fg">Backoffice</span>
         </div>
       </header>

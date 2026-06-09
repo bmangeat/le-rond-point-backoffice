@@ -23,9 +23,12 @@ function LoginForm() {
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-xl text-white">
-            ⦿
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/bo-logo.svg"
+            alt="Rond Point Backoffice"
+            className="mx-auto mb-3 h-14 w-14 rounded-2xl"
+          />
           <h1 className="text-xl font-extrabold text-fg">Backoffice Rond Point</h1>
           <p className="mt-1 text-sm text-muted">Réservé aux Super Admins.</p>
         </div>
