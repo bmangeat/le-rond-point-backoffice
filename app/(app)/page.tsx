@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -23,25 +24,43 @@ function formatBytes(bytes: number): string {
 }
 
 async function getDashboardData() {
-  const [groupCount, activeUserCount, eventsThisMonth, photoCount] =
-    await Promise.all([
-      prisma.group.count(),
-      prisma.user.count({ where: { isActive: true } }),
-      prisma.event.count({
-        where: {
-          whenAt: { gte: startOfMonthUTC(), lt: startOfNextMonthUTC() },
-          cancelledAt: null,
-        },
-      }),
-      prisma.eventPhoto.count(),
-    ]);
+  const [
+    groupCount,
+    activeUserCount,
+    eventsThisMonth,
+    photoCount,
+    pendingReports,
+  ] = await Promise.all([
+    prisma.group.count(),
+    prisma.user.count({ where: { isActive: true } }),
+    prisma.event.count({
+      where: {
+        whenAt: { gte: startOfMonthUTC(), lt: startOfNextMonthUTC() },
+        cancelledAt: null,
+      },
+    }),
+    prisma.eventPhoto.count(),
+    // Nombre distinct de commentaires actuellement signalés (= à traiter).
+    prisma.eventComment.count({ where: { reports: { some: {} } } }),
+  ]);
 
-  return { groupCount, activeUserCount, eventsThisMonth, photoCount };
+  return {
+    groupCount,
+    activeUserCount,
+    eventsThisMonth,
+    photoCount,
+    pendingReports,
+  };
 }
 
 export default async function DashboardPage() {
-  const { groupCount, activeUserCount, eventsThisMonth, photoCount } =
-    await getDashboardData();
+  const {
+    groupCount,
+    activeUserCount,
+    eventsThisMonth,
+    photoCount,
+    pendingReports,
+  } = await getDashboardData();
 
   const estimatedBytes = photoCount * BLOB_AVG_PHOTO_BYTES;
   const quotaPct = Math.min(
@@ -66,6 +85,30 @@ export default async function DashboardPage() {
         <Kpi label="Utilisateurs actifs" value={activeUserCount} icon="🧑‍🤝‍🧑" />
         <Kpi label="Sorties ce mois-ci" value={eventsThisMonth} icon="📅" />
       </section>
+
+      {/* Alerte modération : visible uniquement s'il y a des signalements à traiter. */}
+      {pendingReports > 0 && (
+        <Link
+          href="/moderation/reports"
+          className="card flex items-center justify-between gap-4 border-destructive/30 bg-destructive/5 transition hover:bg-destructive/10"
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-destructive/10 text-lg">
+              🚩
+            </span>
+            <div>
+              <div className="text-sm font-bold text-fg">
+                {pendingReports} commentaire{pendingReports > 1 ? "s" : ""}{" "}
+                signalé{pendingReports > 1 ? "s" : ""} à traiter
+              </div>
+              <div className="text-xs text-muted">
+                Conformité DSA — ouvrir la modération.
+              </div>
+            </div>
+          </div>
+          <span className="text-sm font-semibold text-destructive">→</span>
+        </Link>
+      )}
 
       {/* Suivi de la charge Vercel Blob */}
       <section className="card">
