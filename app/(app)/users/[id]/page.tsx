@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/format";
 import UserActions from "@/app/components/UserActions";
+import { ANONYMIZED_EMAIL_DOMAIN } from "@/lib/anonymize";
 
 export const dynamic = "force-dynamic";
 
@@ -128,6 +129,7 @@ export default async function UserDetailPage({
             isActive={user.isActive}
             groupId={user.groupId}
             groups={groupList}
+            anonymized={user.email.endsWith(ANONYMIZED_EMAIL_DOMAIN)}
           />
         </div>
       </section>

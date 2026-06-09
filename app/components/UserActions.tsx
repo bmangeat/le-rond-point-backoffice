@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { setUserActive } from "@/app/(app)/users/actions";
+import { setUserActive, anonymizeUser } from "@/app/(app)/users/actions";
 import {
   assignToGroup,
   removeFromGroup,
@@ -18,12 +18,14 @@ export default function UserActions({
   isActive,
   groupId,
   groups,
+  anonymized,
 }: {
   userId: string;
   role: string;
   isActive: boolean;
   groupId: string | null;
   groups: GroupOption[];
+  anonymized: boolean;
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -130,6 +132,43 @@ export default function UserActions({
       )}
 
       {error && <p className="text-sm font-medium text-destructive">{error}</p>}
+
+      {/* Zone RGPD — droit à l'effacement */}
+      {!isSuperAdmin && (
+        <div className="mt-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+          <div className="text-xs font-bold uppercase tracking-wide text-destructive">
+            Zone RGPD
+          </div>
+          {anonymized ? (
+            <p className="mt-1 text-sm text-muted">
+              Ce compte a déjà été anonymisé (droit à l&apos;effacement exercé).
+            </p>
+          ) : (
+            <>
+              <p className="mt-1 text-sm text-muted">
+                Efface définitivement les données d&apos;identification et de
+                contact (nom, e-mail, téléphone, réseaux), supprime les
+                abonnements push et les connexions. L&apos;historique du groupe
+                est conservé sous « Compte supprimé ».
+              </p>
+              <button
+                className="mt-2 rounded-xl bg-destructive px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+                disabled={isPending}
+                onClick={() => {
+                  if (
+                    confirm(
+                      "Anonymiser ce compte (droit à l'effacement RGPD) ? Cette action est IRRÉVERSIBLE.",
+                    )
+                  )
+                    run(() => anonymizeUser(userId));
+                }}
+              >
+                {isPending ? "…" : "Anonymiser (droit à l'effacement)"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
