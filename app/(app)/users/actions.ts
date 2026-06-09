@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { assertSuperAdmin } from "@/lib/admin";
 import { ANONYMIZED_EMAIL_DOMAIN } from "@/lib/anonymize";
+import { logAudit, AUDIT } from "@/lib/audit";
 import type { ActionResult } from "@/app/(app)/groups/actions";
 
 /**
@@ -14,8 +15,9 @@ export async function setUserActive(
   userId: string,
   active: boolean,
 ): Promise<ActionResult> {
+  let admin;
   try {
-    await assertSuperAdmin();
+    admin = await assertSuperAdmin();
   } catch {
     return { ok: false, error: "Accès refusé." };
   }
@@ -34,6 +36,12 @@ export async function setUserActive(
     data: { isActive: active },
   });
 
+  await logAudit(
+    admin,
+    active ? AUDIT.USER_REACTIVATED : AUDIT.USER_DEACTIVATED,
+    { type: "User", id: userId },
+  );
+
   revalidatePath(`/users/${userId}`);
   revalidatePath("/users");
   revalidatePath("/");
@@ -50,8 +58,9 @@ export async function setUserActive(
  * Irréversible. Un SUPER_ADMIN ne peut pas être anonymisé ici.
  */
 export async function anonymizeUser(userId: string): Promise<ActionResult> {
+  let admin;
   try {
-    await assertSuperAdmin();
+    admin = await assertSuperAdmin();
   } catch {
     return { ok: false, error: "Accès refusé." };
   }
@@ -95,6 +104,10 @@ export async function anonymizeUser(userId: string): Promise<ActionResult> {
     prisma.account.deleteMany({ where: { userId } }),
     prisma.session.deleteMany({ where: { userId } }),
   ]);
+
+  // ⚠️ Aucune donnée perso du compte effacé dans l'audit (ce serait contraire
+  // au but de l'anonymisation) — seul l'id technique est tracé.
+  await logAudit(admin, AUDIT.USER_ANONYMIZED, { type: "User", id: userId });
 
   revalidatePath(`/users/${userId}`);
   revalidatePath("/users");

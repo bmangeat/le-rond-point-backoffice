@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { assertSuperAdmin } from "@/lib/admin";
 import { generateSecureToken } from "@/lib/format";
 import { buildInviteUrl } from "@/lib/invite";
+import { logAudit, AUDIT } from "@/lib/audit";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -50,8 +51,9 @@ export async function assignToGroup(
   userId: string,
   groupId: string,
 ): Promise<ActionResult> {
+  let admin;
   try {
-    await assertSuperAdmin();
+    admin = await assertSuperAdmin();
   } catch {
     return { ok: false, error: "Accès refusé." };
   }
@@ -79,6 +81,10 @@ export async function assignToGroup(
     data: { groupId, memberColor },
   });
 
+  await logAudit(admin, AUDIT.USER_ASSIGNED_GROUP, { type: "User", id: userId }, {
+    groupId,
+  });
+
   revalidatePath("/groups");
   revalidatePath(`/groups/${groupId}`);
   revalidatePath("/");
@@ -93,8 +99,9 @@ export async function removeFromGroup(
   userId: string,
   groupId: string,
 ): Promise<ActionResult> {
+  let admin;
   try {
-    await assertSuperAdmin();
+    admin = await assertSuperAdmin();
   } catch {
     return { ok: false, error: "Accès refusé." };
   }
@@ -116,6 +123,10 @@ export async function removeFromGroup(
     data: { groupId: null, role: "MEMBER" },
   });
 
+  await logAudit(admin, AUDIT.USER_REMOVED_GROUP, { type: "User", id: userId }, {
+    groupId,
+  });
+
   revalidatePath(`/groups/${groupId}`);
   revalidatePath("/groups");
   revalidatePath("/");
@@ -129,8 +140,9 @@ export async function removeFromGroup(
 export async function generateInvitation(
   groupId: string,
 ): Promise<CreateGroupResult> {
+  let admin;
   try {
-    await assertSuperAdmin();
+    admin = await assertSuperAdmin();
   } catch {
     return { ok: false, error: "Accès refusé." };
   }
@@ -142,13 +154,20 @@ export async function generateInvitation(
   if (!group) return { ok: false, error: "Groupe introuvable." };
 
   const token = generateSecureToken();
-  await prisma.invitation.create({
+  const inv = await prisma.invitation.create({
     data: {
       groupId,
       token,
       expiresAt: new Date(Date.now() + INVITE_TTL_MS),
     },
   });
+
+  await logAudit(
+    admin,
+    AUDIT.INVITATION_GENERATED,
+    { type: "Invitation", id: inv.id },
+    { groupId },
+  );
 
   revalidatePath(`/groups/${groupId}`);
   return { ok: true, inviteUrl: buildInviteUrl(token) };
@@ -162,8 +181,9 @@ export async function deleteInvitation(
   invitationId: string,
   groupId: string,
 ): Promise<ActionResult> {
+  let admin;
   try {
-    await assertSuperAdmin();
+    admin = await assertSuperAdmin();
   } catch {
     return { ok: false, error: "Accès refusé." };
   }
@@ -182,6 +202,13 @@ export async function deleteInvitation(
 
   await prisma.invitation.delete({ where: { id: invitationId } });
 
+  await logAudit(
+    admin,
+    AUDIT.INVITATION_DELETED,
+    { type: "Invitation", id: invitationId },
+    { groupId },
+  );
+
   revalidatePath(`/groups/${groupId}`);
   return { ok: true };
 }
@@ -196,8 +223,9 @@ export async function deleteInvitation(
 export async function createGroup(
   formData: FormData,
 ): Promise<CreateGroupResult> {
+  let admin;
   try {
-    await assertSuperAdmin();
+    admin = await assertSuperAdmin();
   } catch {
     return { ok: false, error: "Accès refusé." };
   }
@@ -208,8 +236,9 @@ export async function createGroup(
 
   const token = generateSecureToken();
 
+  let newGroupId: string;
   try {
-    await prisma.$transaction(async (tx) => {
+    newGroupId = await prisma.$transaction(async (tx) => {
       const newGroup = await tx.group.create({ data: { name } });
       await tx.invitation.create({
         data: {
@@ -218,11 +247,17 @@ export async function createGroup(
           expiresAt: new Date(Date.now() + INVITE_TTL_MS),
         },
       });
+      return newGroup.id;
     });
   } catch (e) {
     console.error("createGroup failed", e);
     return { ok: false, error: "Échec de la création du groupe." };
   }
+
+  await logAudit(admin, AUDIT.GROUP_CREATED, { type: "Group", id: newGroupId }, {
+    groupId: newGroupId,
+    metadata: { name },
+  });
 
   revalidatePath("/groups");
   revalidatePath("/");
@@ -237,8 +272,9 @@ export async function promoteToAdmin(
   userId: string,
   groupId: string,
 ): Promise<ActionResult> {
+  let admin;
   try {
-    await assertSuperAdmin();
+    admin = await assertSuperAdmin();
   } catch {
     return { ok: false, error: "Accès refusé." };
   }
@@ -260,6 +296,11 @@ export async function promoteToAdmin(
     data: { role: "ADMIN" },
   });
 
+  await logAudit(admin, AUDIT.ROLE_CHANGED, { type: "User", id: userId }, {
+    groupId,
+    metadata: { from: "MEMBER", to: "ADMIN" },
+  });
+
   revalidatePath(`/groups/${groupId}`);
   return { ok: true };
 }
@@ -271,8 +312,9 @@ export async function demoteToMember(
   userId: string,
   groupId: string,
 ): Promise<ActionResult> {
+  let admin;
   try {
-    await assertSuperAdmin();
+    admin = await assertSuperAdmin();
   } catch {
     return { ok: false, error: "Accès refusé." };
   }
@@ -292,6 +334,11 @@ export async function demoteToMember(
   await prisma.user.update({
     where: { id: userId },
     data: { role: "MEMBER" },
+  });
+
+  await logAudit(admin, AUDIT.ROLE_CHANGED, { type: "User", id: userId }, {
+    groupId,
+    metadata: { from: "ADMIN", to: "MEMBER" },
   });
 
   revalidatePath(`/groups/${groupId}`);

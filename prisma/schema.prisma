@@ -259,6 +259,30 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+// ─── Audit (RGPD) ─────────────────────────────────────────────────────────────
+// ⚠️ Table créée et migrée par le-rond-point (source de vérité du schéma). Ici on
+// se contente de la déclarer à l'identique pour générer le client typé. Doit
+// rester STRICTEMENT alignée avec le schéma de le-rond-point.
+// Journal append-only des actions sensibles des Super Admins. Pas de clé
+// étrangère : un log doit survivre à la suppression/anonymisation de l'acteur.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actorEmail String
+  action     String
+  targetType String
+  targetId   String
+  groupId    String?
+  reason     String?  @db.VarChar(500)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([actorId])
+  @@index([targetType, targetId])
+}
+
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum Role {

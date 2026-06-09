@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { assertSuperAdmin } from "@/lib/admin";
 import { isPushConfigured, sendToSubscription } from "@/lib/push";
+import { logAudit, AUDIT } from "@/lib/audit";
 
 export type BroadcastResult =
   | {
@@ -21,8 +22,9 @@ const BATCH = 50;
  * l'app le-rond-point). Nettoie au passage les abonnements morts (404/410).
  */
 export async function sendBroadcast(formData: FormData): Promise<BroadcastResult> {
+  let admin;
   try {
-    await assertSuperAdmin();
+    admin = await assertSuperAdmin();
   } catch {
     return { ok: false, error: "Accès refusé." };
   }
@@ -88,6 +90,16 @@ export async function sendBroadcast(formData: FormData): Promise<BroadcastResult
   if (deadIds.length > 0) {
     await prisma.pushSubscription.deleteMany({ where: { id: { in: deadIds } } });
   }
+
+  await logAudit(
+    admin,
+    AUDIT.BROADCAST_SENT,
+    { type: "Broadcast", id: groupId ?? "all" },
+    {
+      groupId,
+      metadata: { title, sent, failed, total: subscriptions.length },
+    },
+  );
 
   return {
     ok: true,

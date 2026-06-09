@@ -12,6 +12,7 @@ const NAV = [
   { href: "/users", label: "Utilisateurs", icon: "🧑" },
   { href: "/moderation/reports", label: "Modération", icon: "🚩" },
   { href: "/broadcast", label: "Broadcast push", icon: "📣" },
+  { href: "/audit", label: "Journal d'audit", icon: "🛡️" },
   { href: "/logs", label: "Logs & activité", icon: "📜" },
 ];
 

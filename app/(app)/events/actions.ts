@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { assertSuperAdmin } from "@/lib/admin";
+import { logAudit, AUDIT } from "@/lib/audit";
 import type { ActionResult } from "@/app/(app)/groups/actions";
 
 /**
@@ -13,8 +14,9 @@ export async function cancelEvent(
   eventId: string,
   reason: string,
 ): Promise<ActionResult> {
+  let admin;
   try {
-    await assertSuperAdmin();
+    admin = await assertSuperAdmin();
   } catch {
     return { ok: false, error: "Accès refusé." };
   }
@@ -26,7 +28,7 @@ export async function cancelEvent(
 
   const event = await prisma.event.findUnique({
     where: { id: eventId },
-    select: { id: true, cancelledAt: true },
+    select: { id: true, cancelledAt: true, groupId: true },
   });
   if (!event) return { ok: false, error: "Sortie introuvable." };
   if (event.cancelledAt) return { ok: false, error: "Sortie déjà annulée." };
@@ -34,6 +36,11 @@ export async function cancelEvent(
   await prisma.event.update({
     where: { id: eventId },
     data: { cancelledAt: new Date(), cancelReason: trimmed },
+  });
+
+  await logAudit(admin, AUDIT.EVENT_CANCELLED, { type: "Event", id: eventId }, {
+    groupId: event.groupId,
+    reason: trimmed,
   });
 
   revalidatePath(`/events/${eventId}`);
@@ -46,15 +53,16 @@ export async function cancelEvent(
  * Restaure une sortie annulée (remet cancelledAt/cancelReason à null).
  */
 export async function restoreEvent(eventId: string): Promise<ActionResult> {
+  let admin;
   try {
-    await assertSuperAdmin();
+    admin = await assertSuperAdmin();
   } catch {
     return { ok: false, error: "Accès refusé." };
   }
 
   const event = await prisma.event.findUnique({
     where: { id: eventId },
-    select: { id: true, cancelledAt: true },
+    select: { id: true, cancelledAt: true, groupId: true },
   });
   if (!event) return { ok: false, error: "Sortie introuvable." };
   if (!event.cancelledAt) return { ok: false, error: "Sortie déjà active." };
@@ -62,6 +70,10 @@ export async function restoreEvent(eventId: string): Promise<ActionResult> {
   await prisma.event.update({
     where: { id: eventId },
     data: { cancelledAt: null, cancelReason: null },
+  });
+
+  await logAudit(admin, AUDIT.EVENT_RESTORED, { type: "Event", id: eventId }, {
+    groupId: event.groupId,
   });
 
   revalidatePath(`/events/${eventId}`);

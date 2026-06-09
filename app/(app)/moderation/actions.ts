@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { assertSuperAdmin } from "@/lib/admin";
+import { logAudit, AUDIT } from "@/lib/audit";
 import type { ActionResult } from "@/app/(app)/groups/actions";
 
 /**
@@ -13,19 +14,33 @@ import type { ActionResult } from "@/app/(app)/groups/actions";
 export async function deleteReportedComment(
   commentId: string,
 ): Promise<ActionResult> {
+  let admin;
   try {
-    await assertSuperAdmin();
+    admin = await assertSuperAdmin();
   } catch {
     return { ok: false, error: "Accès refusé." };
   }
 
   const comment = await prisma.eventComment.findUnique({
     where: { id: commentId },
-    select: { id: true },
+    select: { id: true, text: true, _count: { select: { reports: true } } },
   });
   if (!comment) return { ok: false, error: "Commentaire introuvable." };
 
   await prisma.eventComment.delete({ where: { id: commentId } });
+
+  // Snapshot du contenu retiré (accountability DSA), tronqué.
+  await logAudit(
+    admin,
+    AUDIT.COMMENT_DELETED,
+    { type: "EventComment", id: commentId },
+    {
+      metadata: {
+        textSnapshot: comment.text.slice(0, 200),
+        reportCount: comment._count.reports,
+      },
+    },
+  );
 
   revalidatePath("/moderation/reports");
   revalidatePath("/");
@@ -39,8 +54,9 @@ export async function deleteReportedComment(
 export async function dismissReports(
   commentId: string,
 ): Promise<ActionResult> {
+  let admin;
   try {
-    await assertSuperAdmin();
+    admin = await assertSuperAdmin();
   } catch {
     return { ok: false, error: "Accès refusé." };
   }
@@ -51,6 +67,13 @@ export async function dismissReports(
   if (deleted.count === 0) {
     return { ok: false, error: "Aucun signalement à rejeter." };
   }
+
+  await logAudit(
+    admin,
+    AUDIT.REPORTS_DISMISSED,
+    { type: "EventComment", id: commentId },
+    { metadata: { dismissedCount: deleted.count } },
+  );
 
   revalidatePath("/moderation/reports");
   revalidatePath("/");
