@@ -8,6 +8,7 @@ import { signOut } from "next-auth/react";
 const NAV = [
   { href: "/", label: "Tableau de bord", icon: "📊" },
   { href: "/groups", label: "Groupes", icon: "👥" },
+  { href: "/events", label: "Sorties", icon: "📅" },
   { href: "/users", label: "Utilisateurs", icon: "🧑" },
   { href: "/moderation/reports", label: "Modération", icon: "🚩" },
   { href: "/broadcast", label: "Broadcast push", icon: "📣" },
