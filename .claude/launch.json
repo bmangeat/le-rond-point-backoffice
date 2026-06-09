@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backoffice-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/bricemangeat/Claude/Projects/rond-point-backoffice && npm run dev"
+      ],
+      "port": 3000
+    }
+  ]
+}
